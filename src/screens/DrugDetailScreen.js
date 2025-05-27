@@ -17,6 +17,10 @@ import { Audio } from "expo-av";
 
 import { selectCurrentUser } from "../redux/authSlice";
 import { api as baseUrl } from "../API/drugSpeakAPI";
+import { useEffect } from "react";
+import axios from "axios";
+
+
 
 export default function DrugDetailScreen({ route, navigation }) {
 	const [playerSpeeds, setPlayerSpeeds] = useState({});
@@ -24,6 +28,7 @@ export default function DrugDetailScreen({ route, navigation }) {
 	const [openIndex, setOpenIndex] = useState(null);
 	const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
 	const [speedOpen, setSpeedOpen] = useState(false);
+	const [studyRecord, setStudyRecord] = useState(null);
 	const [speedItems, setSpeedItems] = useState([
 		{ label: "0.25x", value: 0.25 },
 		{ label: "0.33x", value: 0.33 },
