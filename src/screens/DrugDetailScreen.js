@@ -19,8 +19,7 @@ import { selectCurrentUser } from "../redux/authSlice";
 import { api as baseUrl } from "../API/drugSpeakAPI";
 import { useEffect } from "react";
 import axios from "axios";
-
-
+import { studyAPI } from "../API/drugSpeakAPI"; // make sure the path is correct
 
 export default function DrugDetailScreen({ route, navigation }) {
 	const [playerSpeeds, setPlayerSpeeds] = useState({});
@@ -60,12 +59,13 @@ export default function DrugDetailScreen({ route, navigation }) {
 					console.log("Study record found:", response.data);
 				})
 				.catch((error) => {
-					console.log("No study record found, will create one on study:", error.message);
+					console.log(
+						"No study record found, will create one on study:",
+						error.message
+					);
 				});
-			
 		}
 	}, [userId]);
-	
 
 	const playAudio = async (uri) => {
 		try {
@@ -129,28 +129,22 @@ export default function DrugDetailScreen({ route, navigation }) {
 						style={styles.studyButton}
 						onPress={async () => {
 							dispatch(addToLearning(drug));
-						
-							let newRecord;
-							if (studyRecord) {
-								newRecord = {
-									currentLearning: studyRecord.currentLearning + 1,
-									finishedLearning: studyRecord.finishedLearning,
-									totalScore: studyRecord.totalScore,
-								};
-							} else {
-								newRecord = {
-									currentLearning: 1,
-									finishedLearning: 0,
-									totalScore: Math.floor(Math.random() * 100), // random score
-								};
-							}
-						
+
+							const newRecord = {
+								currentLearning: studyRecord?.currentLearning
+									? studyRecord.currentLearning + 1
+									: 1,
+								finishedLearning: studyRecord?.finishedLearning || 0,
+								totalScore:
+									studyRecord?.totalScore || Math.floor(Math.random() * 100),
+							};
+
 							try {
-								await axios.post(`${baseUrl}/study-records`, {
-									userId,
-									...newRecord,
-								});
-								Alert.alert("Added to Learning List", `${drug.name} has been added to your study list`);
+								await studyAPI.createOrUpdateRecord(userId, newRecord);
+								Alert.alert(
+									"Added to Learning List",
+									`${drug.name} has been added to your study list`
+								);
 								setStudyRecord((prev) =>
 									prev ? { ...prev, ...newRecord } : { userId, ...newRecord }
 								);
@@ -158,7 +152,6 @@ export default function DrugDetailScreen({ route, navigation }) {
 								console.error("Failed to update study record:", error.message);
 							}
 						}}
-						
 					>
 						<Text style={styles.studyText}>STUDY</Text>
 					</TouchableOpacity>

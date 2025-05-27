@@ -1,3 +1,4 @@
+import axios from "axios";
 import React, { useEffect, useState } from "react";
 import {
 	View,
@@ -10,6 +11,8 @@ import {
 import { useSelector } from "react-redux";
 import { getRankings } from "../API/drugSpeakAPI";
 import { useNavigation } from "@react-navigation/native";
+import { api as baseUrl } from "../API/drugSpeakAPI";
+import { api } from "../API/drugSpeakAPI";
 
 export default function CommunityScreen() {
 	const [rankings, setRankings] = useState([]);
@@ -20,12 +23,23 @@ export default function CommunityScreen() {
 	const fetchRankings = async () => {
 		try {
 			setLoading(true);
+			await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulated delay
 
-			// Simulate 2-second delay as required
-			await new Promise((resolve) => setTimeout(resolve, 2000));
+			const response = await api.get("/study-record");
 
-			const data = await getRankings();
-			setRankings(data.sort((a, b) => b.score - a.score));
+			const rawData = response.data;
+
+			const formattedData = rawData.map((item) => ({
+				id: item.userId,
+				name: item.user?.username || "Unknown",
+				score: item.totalScore,
+				learningCount: item.currentLearning,
+				finishedCount: item.finishedLearning,
+			}));
+
+			// Sort by totalScore descending
+			formattedData.sort((a, b) => b.score - a.score);
+			setRankings(formattedData);
 		} catch (error) {
 			console.error("Error fetching rankings:", error);
 			Alert.alert("Error", "Failed to fetch rankings");

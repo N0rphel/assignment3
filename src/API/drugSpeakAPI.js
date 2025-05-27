@@ -107,6 +107,28 @@ export const communityAPI = {
 	getRecentActivity: () => request("GET", "/community/activity"),
 };
 
+// ================= Study Record =================
+export const studyAPI = {
+	createOrUpdateRecord: (userId, record) =>
+		request("POST", "/study-record", {
+			userId,
+			...record,
+		}),
+	getStudyRecord: (userId) => request("GET", `/study-record/${userId}`),
+};
+
+export const studyRecordAPI = {
+	getAll: () => request("GET", "/study-record"),
+
+	getByUserId: (userId) => request("GET", `/study-record/${userId}`),
+
+	updateMyRecord: ({ currentLearning, finishedLearning, totalScore }) =>
+		request("POST", "/study-record", {
+			currentLearning,
+			finishedLearning,
+			totalScore,
+		}),
+};
 // ================= Audio & Evaluation =================
 export const evaluationAPI = {
 	submitRecording: async (drugId, audioUri) => {
