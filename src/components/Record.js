@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Button, StyleSheet, Text } from "react-native";
+import { View, Button, StyleSheet, Text, Alert } from "react-native";
 import { Audio } from "expo-av";
 
 export default function App() {
@@ -9,82 +9,77 @@ export default function App() {
 	const [isRecording, setIsRecording] = useState(false);
 
 	useEffect(() => {
-		// Ask for audio recording permissions
 		(async () => {
 			const { status } = await Audio.requestPermissionsAsync();
 			if (status !== "granted") {
-				alert("Permission to access microphone is required!");
+				Alert.alert("Permission to access microphone was denied");
 			}
 		})();
 	}, []);
 
-	async function startRecording() {
+	const startRecording = async () => {
 		try {
-			console.log("Requesting permissions...");
 			await Audio.setAudioModeAsync({
 				allowsRecordingIOS: true,
 				playsInSilentModeIOS: true,
+				// interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX, // Changed this line
+				// interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
 			});
 
-			console.log("Starting recording...");
 			const { recording } = await Audio.Recording.createAsync(
 				Audio.RecordingOptionsPresets.HIGH_QUALITY
 			);
-
 			setRecording(recording);
 			setIsRecording(true);
-			console.log("Recording started");
 		} catch (err) {
 			console.error("Failed to start recording", err);
 		}
-	}
+	};
 
-	async function stopRecording() {
-		console.log("Stopping recording...");
+	const stopRecording = async () => {
 		setRecording(undefined);
 		setIsRecording(false);
 		await recording.stopAndUnloadAsync();
 		const uri = recording.getURI();
 		setRecordedUri(uri);
-		console.log("Recording stopped and stored at:", uri);
-	}
+		console.log("Recording saved to:", uri);
+	};
 
-	async function playRecording() {
+	const playRecording = async () => {
 		if (!recordedUri) return;
 
-		console.log("Loading sound from:", recordedUri);
 		const { sound } = await Audio.Sound.createAsync(
 			{ uri: recordedUri },
 			{ shouldPlay: true }
 		);
 		setSound(sound);
-		console.log("Playing sound...");
-		await sound.playAsync();
-	}
+	};
 
 	useEffect(() => {
-		return sound
-			? () => {
-					console.log("Unloading sound");
-					sound.unloadAsync();
-			  }
-			: undefined;
+		return () => {
+			if (sound) {
+				sound.unloadAsync();
+			}
+		};
 	}, [sound]);
 
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>🎤 Audio Recorder</Text>
+
 			<Button
-				title={isRecording ? "Stop Recording" : "Start Recording"}
+				title={isRecording ? "🛑 Stop Recording" : "🎤 Start Recording"}
 				onPress={isRecording ? stopRecording : startRecording}
 			/>
-			<View style={{ marginTop: 20 }}>
-				<Button
-					title="Play Recording"
-					onPress={playRecording}
-					disabled={!recordedUri}
-				/>
-			</View>
+
+			<View style={{ height: 20 }} />
+
+			<Button
+				title="▶️ Play Recording"
+				onPress={playRecording}
+				disabled={!recordedUri}
+			/>
+
 			{recordedUri && <Text style={styles.path}>Saved to: {recordedUri}</Text>}
 		</View>
 	);
@@ -92,17 +87,19 @@ export default function App() {
 
 const styles = StyleSheet.create({
 	container: {
-		marginTop: 100,
-		alignItems: "center",
+		flex: 1,
 		justifyContent: "center",
+		alignItems: "center",
 		padding: 20,
+		backgroundColor: "#ecf0f1",
 	},
 	title: {
-		fontSize: 20,
+		fontSize: 22,
+		fontWeight: "bold",
 		marginBottom: 20,
 	},
 	path: {
-		marginTop: 10,
+		marginTop: 20,
 		fontSize: 12,
 		color: "#555",
 		textAlign: "center",
