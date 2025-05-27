@@ -28,6 +28,7 @@ export default function CommunityScreen() {
 			const response = await api.get("/study-record");
 
 			const rawData = response.data;
+			console.log(rawData)
 
 			const formattedData = rawData.map((item) => ({
 				id: item.userId,
