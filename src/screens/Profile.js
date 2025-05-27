@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
 	View,
 	Text,
@@ -11,13 +11,17 @@ import {
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../redux/authSlice";
-import { updateUserProfile } from "../API/drugSpeakAPI";
+import { updateUserProfile, studyAPI } from "../API/drugSpeakAPI";
 
 export default function ProfileScreen({ navigation }) {
 	const dispatch = useDispatch();
 	const { user } = useSelector((state) => state.auth);
-	const learningState = useSelector((state) => state.learning); // Get learning stats
-
+	const learningState = useSelector((state) => state.learning); // Keep for Redux stats
+	
+	// State for API study record
+	const [studyRecord, setStudyRecord] = useState(null);
+	const [loadingStats, setLoadingStats] = useState(true);
+	
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [showUpdateForm, setShowUpdateForm] = useState(false);
 	const [formData, setFormData] = useState({
@@ -26,17 +30,41 @@ export default function ProfileScreen({ navigation }) {
 		gender: user?.gender || "",
 	});
 
+	// Fetch study record on component mount
+	useEffect(() => {
+		if (user?.id) {
+			fetchStudyRecord();
+		}
+	}, [user?.id]);
+
+	const fetchStudyRecord = async () => {
+		try {
+			setLoadingStats(true);
+			const response = await studyAPI.getStudyRecord(user.id);
+			setStudyRecord(response);
+			console.log("Profile - Study record fetched:", response);
+		} catch (error) {
+			console.log("Profile - No study record found:", error.message);
+			// Set default values if no record exists
+			setStudyRecord({
+				currentLearning: 0,
+				finishedLearning: 0,
+				totalScore: 0
+			});
+		} finally {
+			setLoadingStats(false);
+		}
+	};
+
 	const handleUpdate = async () => {
 		if (!formData.username.trim()) {
 			Alert.alert("Error", "Username cannot be empty");
 			return;
 		}
-
 		if (formData.password && formData.password.length < 6) {
 			Alert.alert("Error", "Password must be at least 6 characters");
 			return;
 		}
-
 		setIsUpdating(true);
 		try {
 			await updateUserProfile(user._id, {
@@ -64,20 +92,62 @@ export default function ProfileScreen({ navigation }) {
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>User Profile</Text>
-			<Text>User Name: {user?.username}</Text>
-			<Text>Email: {user?.email}</Text>
-			<Text>Gender: {user?.gender}</Text>
-			<Text>Current Learning: {learningState?.current?.length || 0}</Text>
-			<Text>Finished: {learningState?.finished?.length || 0}</Text>
-			<Text>Total Score: {learningState?.totalScore || 0}</Text>
+			
+			{/* User Info */}
+			<View style={styles.infoSection}>
+				<Text style={styles.infoText}>User Name: {user?.username}</Text>
+				<Text style={styles.infoText}>Email: {user?.email}</Text>
+				<Text style={styles.infoText}>Gender: {user?.gender}</Text>
+			</View>
+
+			{/* Learning Stats */}
+			<View style={styles.statsSection}>
+				<Text style={styles.statsTitle}>Learning Statistics</Text>
+				
+				{loadingStats ? (
+					<Text style={styles.loadingText}>Loading stats...</Text>
+				) : (
+					<>
+						<Text style={styles.statsText}>
+							Current Learning: {studyRecord?.currentLearning || 0}
+						</Text>
+						<Text style={styles.statsText}>
+							Finished: {studyRecord?.finishedLearning || 0}
+						</Text>
+						<Text style={styles.statsText}>
+							Total Score: {studyRecord?.totalScore || 0}
+						</Text>
+						
+						{/* Optional: Show Redux stats for comparison */}
+						<View style={styles.reduxStats}>
+							<Text style={styles.reduxStatsTitle}>Redux Stats (for comparison):</Text>
+							<Text style={styles.reduxStatsText}>
+								Current: {learningState?.current?.length || 0}, 
+								Finished: {learningState?.finished?.length || 0}
+							</Text>
+						</View>
+					</>
+				)}
+				
+				{/* Refresh button */}
+				<TouchableOpacity 
+					style={styles.refreshButton} 
+					onPress={fetchStudyRecord}
+					disabled={loadingStats}
+				>
+					<Text style={styles.refreshButtonText}>
+						{loadingStats ? "Loading..." : "Refresh Stats"}
+					</Text>
+				</TouchableOpacity>
+			</View>
 
 			{/* Update Button */}
-			<Button title="Update" onPress={() => setShowUpdateForm(true)} />
+			<Button title="Update Profile" onPress={() => setShowUpdateForm(true)} />
 
 			{/* Update Profile Modal */}
 			<Modal visible={showUpdateForm} animationType="slide">
 				<View style={styles.modalContainer}>
-					<Text style={styles.modalTitle}>User Profile</Text>
+					<Text style={styles.modalTitle}>Update Profile</Text>
 					<Text style={styles.label}>New User Name</Text>
 					<TextInput
 						value={formData.username}
@@ -94,6 +164,7 @@ export default function ProfileScreen({ navigation }) {
 						}
 						secureTextEntry
 						style={styles.input}
+						placeholder="Leave empty to keep current password"
 					/>
 					<View style={styles.buttonRow}>
 						<Button
@@ -122,9 +193,69 @@ const styles = StyleSheet.create({
 		padding: 20,
 	},
 	title: {
-		fontSize: 20,
+		fontSize: 24,
 		fontWeight: "bold",
 		marginBottom: 20,
+		textAlign: "center",
+	},
+	infoSection: {
+		backgroundColor: "#f8f9fa",
+		padding: 15,
+		borderRadius: 8,
+		marginBottom: 20,
+	},
+	infoText: {
+		fontSize: 16,
+		marginBottom: 5,
+		color: "#333",
+	},
+	statsSection: {
+		backgroundColor: "#e8f4f8",
+		padding: 15,
+		borderRadius: 8,
+		marginBottom: 20,
+	},
+	statsTitle: {
+		fontSize: 18,
+		fontWeight: "bold",
+		marginBottom: 10,
+		color: "#2c3e50",
+	},
+	statsText: {
+		fontSize: 16,
+		marginBottom: 5,
+		color: "#34495e",
+	},
+	loadingText: {
+		fontSize: 16,
+		color: "#7f8c8d",
+		fontStyle: "italic",
+	},
+	reduxStats: {
+		marginTop: 10,
+		paddingTop: 10,
+		borderTopWidth: 1,
+		borderTopColor: "#bdc3c7",
+	},
+	reduxStatsTitle: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#7f8c8d",
+	},
+	reduxStatsText: {
+		fontSize: 14,
+		color: "#7f8c8d",
+	},
+	refreshButton: {
+		backgroundColor: "#3498db",
+		padding: 10,
+		borderRadius: 5,
+		marginTop: 10,
+		alignItems: "center",
+	},
+	refreshButtonText: {
+		color: "white",
+		fontWeight: "bold",
 	},
 	modalContainer: {
 		flex: 1,
@@ -149,7 +280,8 @@ const styles = StyleSheet.create({
 		marginTop: 20,
 	},
 	label: {
-		marginRight: 10,
+		marginBottom: 5,
 		fontSize: 16,
+		fontWeight: "600",
 	},
 });

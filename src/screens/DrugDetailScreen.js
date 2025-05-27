@@ -52,11 +52,11 @@ export default function DrugDetailScreen({ route, navigation }) {
 
 	useEffect(() => {
 		if (userId) {
-			axios
-				.get(`${baseUrl}/study-records/${userId}`)
+			// Use the API function instead of direct axios call
+			studyAPI.getStudyRecord(userId)
 				.then((response) => {
-					setStudyRecord(response.data);
-					console.log("Study record found:", response.data);
+					setStudyRecord(response); // Note: response is already the data, not response.data
+					console.log("Study record found:", response);
 				})
 				.catch((error) => {
 					console.log(
@@ -136,7 +136,7 @@ export default function DrugDetailScreen({ route, navigation }) {
 									: 1,
 								finishedLearning: studyRecord?.finishedLearning || 0,
 								totalScore:
-									studyRecord?.totalScore || Math.floor(Math.random() * 100),
+									studyRecord?.totalScore || 0,
 							};
 
 							try {
