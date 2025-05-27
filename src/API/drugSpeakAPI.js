@@ -60,10 +60,11 @@ const request = async (method, endpoint, data = null, customHeaders = {}) => {
 };
 
 // ================= Authentication =================
+// ================= Authentication =================
 export const authAPI = {
 	signUp: (userData) =>
 		request("POST", "/users", {
-			username: userData.username.trim(), // Trim whitespace
+			username: userData.username.trim(),
 			email: userData.email.trim().toLowerCase(),
 			password: userData.password,
 			gender: userData.gender || "unspecified",
@@ -75,7 +76,11 @@ export const authAPI = {
 			password: credentials.password,
 		}),
 
-	updateUserProfile: (userId, updates) =>
+	// Use the working endpoint
+	updateUserProfile: (updates) => request("PATCH", "/users/update", updates),
+
+	// Alternative method with user ID if needed
+	updateUserProfileById: (userId, updates) =>
 		request("PATCH", `/users/${userId}`, updates),
 
 	verifyToken: () => request("GET", "/auth/verify"),
