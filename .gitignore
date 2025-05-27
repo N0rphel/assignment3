@@ -1,0 +1,7 @@
+# React Native
+node_modules/
+android/.gradle/
+ios/Pods/
+*.log
+.expo/
+.expo-shared/
