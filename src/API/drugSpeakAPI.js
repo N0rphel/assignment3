@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Create axios instance with default config
-const api = axios.create({
+export const api = axios.create({
 	baseURL: "http://10.2.23.137:3000/", // Added /api/ to match your backend
 	timeout: 10000,
 	headers: {

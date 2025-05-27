@@ -15,6 +15,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { addToLearning } from "../redux/learningSlice";
 import { Audio } from "expo-av";
 
+import { selectCurrentUser } from "../redux/authSlice";
+import { api as baseUrl } from "../API/drugSpeakAPI";
+
 export default function DrugDetailScreen({ route, navigation }) {
 	const [playerSpeeds, setPlayerSpeeds] = useState({});
 	const { drug } = route.params;
@@ -38,6 +41,26 @@ export default function DrugDetailScreen({ route, navigation }) {
 			[index]: speed,
 		}));
 	};
+
+	const user = useSelector(selectCurrentUser);
+	const userId = user?.id;
+	console.log("Current userId:", userId);
+
+	useEffect(() => {
+		if (userId) {
+			axios
+				.get(`${baseUrl}/study-records/${userId}`)
+				.then((response) => {
+					setStudyRecord(response.data);
+					console.log("Study record found:", response.data);
+				})
+				.catch((error) => {
+					console.log("No study record found, will create one on study:", error.message);
+				});
+			
+		}
+	}, [userId]);
+	
 
 	const playAudio = async (uri) => {
 		try {
@@ -99,13 +122,38 @@ export default function DrugDetailScreen({ route, navigation }) {
 				{!isLearning && (
 					<TouchableOpacity
 						style={styles.studyButton}
-						onPress={() => {
+						onPress={async () => {
 							dispatch(addToLearning(drug));
-							Alert.alert(
-								"Added to Learning List",
-								`${drug.name} has been added to your study list`
-							);
+						
+							let newRecord;
+							if (studyRecord) {
+								newRecord = {
+									currentLearning: studyRecord.currentLearning + 1,
+									finishedLearning: studyRecord.finishedLearning,
+									totalScore: studyRecord.totalScore,
+								};
+							} else {
+								newRecord = {
+									currentLearning: 1,
+									finishedLearning: 0,
+									totalScore: Math.floor(Math.random() * 100), // random score
+								};
+							}
+						
+							try {
+								await axios.post(`${baseUrl}/study-records`, {
+									userId,
+									...newRecord,
+								});
+								Alert.alert("Added to Learning List", `${drug.name} has been added to your study list`);
+								setStudyRecord((prev) =>
+									prev ? { ...prev, ...newRecord } : { userId, ...newRecord }
+								);
+							} catch (error) {
+								console.error("Failed to update study record:", error.message);
+							}
 						}}
+						
 					>
 						<Text style={styles.studyText}>STUDY</Text>
 					</TouchableOpacity>
