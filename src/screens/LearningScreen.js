@@ -8,8 +8,10 @@ import {
 	Alert,
 } from "react-native";
 import { Audio } from "expo-av";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { finishDrug, removeDrug } from "../redux/learningSlice";
+import { selectCurrentUser } from "../redux/authSlice";
+import { studyAPI } from "../API/drugSpeakAPI";
 import PronunciationPlayer from "../components/PronunciationPlayer";
 import { drugCategory } from "../../resources/resource";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +21,12 @@ export default function LearningScreen({ route, navigation }) {
 	const [openIndex, setOpenIndex] = useState(null);
 	const [playbackSpeeds, setPlaybackSpeeds] = useState({}); // Track speeds for each player
 	const dispatch = useDispatch();
+	const user = useSelector(selectCurrentUser);
+	const userId = user?.id;
+
+	// State for study record
+	const [studyRecord, setStudyRecord] = useState(null);
+	const [isUpdatingRecord, setIsUpdatingRecord] = useState(false);
 
 	const [recordings, setRecordings] = useState([]);
 	const [recording, setRecording] = useState(null);
@@ -34,6 +42,11 @@ export default function LearningScreen({ route, navigation }) {
 		});
 		setPlaybackSpeeds(initialSpeeds);
 
+		// Fetch current study record
+		if (userId) {
+			fetchStudyRecord();
+		}
+
 		return () => {
 			// Cleanup sound when component unmounts
 			if (sound) {
@@ -43,7 +56,23 @@ export default function LearningScreen({ route, navigation }) {
 				recording.stopAndUnloadAsync();
 			}
 		};
-	}, []);
+	}, [userId]);
+
+	const fetchStudyRecord = async () => {
+		try {
+			const response = await studyAPI.getStudyRecord(userId);
+			setStudyRecord(response);
+			console.log("Learning Screen - Study record fetched:", response);
+		} catch (error) {
+			console.log("Learning Screen - No study record found:", error.message);
+			// Set default values if no record exists
+			setStudyRecord({
+				currentLearning: 0,
+				finishedLearning: 0,
+				totalScore: 0
+			});
+		}
+	};
 
 	const handleSpeedChange = (index, newSpeed) => {
 		setPlaybackSpeeds((prev) => ({
@@ -52,14 +81,103 @@ export default function LearningScreen({ route, navigation }) {
 		}));
 	};
 
-	const handleFinish = () => {
-		dispatch(finishDrug(drug.id));
-		navigation.goBack();
+	const calculateMaxScore = () => {
+		if (recordings.length === 0) return 0;
+		const scores = recordings
+			.filter(recording => recording.score !== null)
+			.map(recording => recording.score);
+		return scores.length > 0 ? Math.max(...scores) : 0;
+	};
+
+	const updateStudyRecordWithScore = async (maxScore) => {
+		if (!studyRecord || !userId) return false;
+
+		try {
+			setIsUpdatingRecord(true);
+			
+			const updatedRecord = {
+				currentLearning: Math.max(0, (studyRecord.currentLearning || 0) - 1),
+				finishedLearning: (studyRecord.finishedLearning || 0) + 1,
+				totalScore: (studyRecord.totalScore || 0) + maxScore,
+			};
+
+			await studyAPI.createOrUpdateRecord(userId, updatedRecord);
+			setStudyRecord(prev => ({ ...prev, ...updatedRecord }));
+			
+			console.log("Study record updated:", updatedRecord);
+			return true;
+		} catch (error) {
+			console.error("Failed to update study record:", error.message);
+			Alert.alert("Error", "Failed to update your progress. Please try again.");
+			return false;
+		} finally {
+			setIsUpdatingRecord(false);
+		}
+	};
+
+	const handleFinish = async () => {
+		// Check if there are any evaluated recordings
+		const evaluatedRecordings = recordings.filter(r => r.score !== null);
+		
+		if (evaluatedRecordings.length === 0) {
+			Alert.alert(
+				"No Evaluated Recordings", 
+				"Please record and evaluate at least one pronunciation before finishing.",
+				[{ text: "OK" }]
+			);
+			return;
+		}
+
+		const maxScore = calculateMaxScore();
+		
+		Alert.alert(
+			"Finish Learning",
+			`Your best score: ${maxScore}\nThis will be added to your total score. Continue?`,
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
+				},
+				{
+					text: "Finish",
+					onPress: async () => {
+						const success = await updateStudyRecordWithScore(maxScore);
+						if (success) {
+							dispatch(finishDrug(drug.id));
+							Alert.alert(
+								"Congratulations!", 
+								`You've completed learning ${drug.name}!\nScore earned: ${maxScore}`,
+								[{ 
+									text: "OK", 
+									onPress: () => navigation.goBack() 
+								}]
+							);
+						}
+					},
+				},
+			]
+		);
 	};
 
 	const handleRemove = () => {
-		dispatch(removeDrug(drug.id));
-		navigation.goBack();
+		Alert.alert(
+			"Remove from Learning",
+			`Remove ${drug.name} from your learning list?`,
+			[
+				{
+					text: "Cancel",
+					style: "cancel",
+				},
+				{
+					text: "Remove",
+					style: "destructive",
+					onPress: () => {
+						dispatch(removeDrug(drug.id));
+						navigation.goBack();
+					},
+				},
+			]
+		);
 	};
 
 	const startRecording = async () => {
@@ -147,9 +265,12 @@ export default function LearningScreen({ route, navigation }) {
 	};
 
 	const evaluateRecording = (index) => {
+		const score = Math.floor(Math.random() * 101);
 		const updated = [...recordings];
-		updated[index].score = Math.floor(Math.random() * 101);
+		updated[index].score = score;
 		setRecordings(updated);
+		
+		Alert.alert("Evaluation Complete", `Score: ${score}/100`);
 	};
 
 	const deleteRecording = (index) => {
@@ -179,6 +300,10 @@ export default function LearningScreen({ route, navigation }) {
 		);
 	};
 
+	// Calculate current max score for display
+	const currentMaxScore = calculateMaxScore();
+	const hasEvaluatedRecordings = recordings.some(r => r.score !== null);
+
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>{drug.name}</Text>
@@ -188,6 +313,15 @@ export default function LearningScreen({ route, navigation }) {
 				{drug.categories.map((id) => drugCategory[id]?.name || id).join(", ")}
 			</Text>
 			<Text style={styles.desc}>{drug.desc}</Text>
+
+			{/* Score Display */}
+			{hasEvaluatedRecordings && (
+				<View style={styles.scoreContainer}>
+					<Text style={styles.scoreText}>
+						Current Best Score: {currentMaxScore}/100
+					</Text>
+				</View>
+			)}
 
 			<FlatList
 				data={drug.sounds}
@@ -227,7 +361,10 @@ export default function LearningScreen({ route, navigation }) {
 						<Text>Recording {index + 1}</Text>
 						<View style={styles.recordingActions}>
 							<TouchableOpacity
-								style={styles.evalButton}
+								style={[
+									styles.evalButton,
+									item.score !== null && styles.evaluatedButton
+								]}
 								onPress={() => evaluateRecording(index)}
 							>
 								<Text style={styles.evalText}>
@@ -244,6 +381,7 @@ export default function LearningScreen({ route, navigation }) {
 					</View>
 				)}
 			/>
+
 			<View style={styles.recordContainer}>
 				<TouchableOpacity
 					style={styles.recordButton}
@@ -255,11 +393,24 @@ export default function LearningScreen({ route, navigation }) {
 			</View>
 
 			<View style={styles.buttonContainer}>
-				<TouchableOpacity onPress={handleFinish} style={styles.finishButton}>
-					<Text style={styles.buttonText}>FINISH</Text>
+				<TouchableOpacity 
+					onPress={handleFinish} 
+					style={[
+						styles.finishButton,
+						isUpdatingRecord && styles.disabledButton
+					]}
+					disabled={isUpdatingRecord}
+				>
+					<Text style={styles.buttonText}>
+						{isUpdatingRecord ? "UPDATING..." : "FINISH"}
+					</Text>
 				</TouchableOpacity>
 
-				<TouchableOpacity onPress={handleRemove} style={styles.removeButton}>
+				<TouchableOpacity 
+					onPress={handleRemove} 
+					style={styles.removeButton}
+					disabled={isUpdatingRecord}
+				>
 					<Text style={styles.buttonText}>REMOVE</Text>
 				</TouchableOpacity>
 			</View>
@@ -290,6 +441,18 @@ const styles = StyleSheet.create({
 		marginTop: 10,
 		fontSize: 15,
 		textAlign: "justify",
+	},
+	scoreContainer: {
+		backgroundColor: "#e8f5e8",
+		padding: 10,
+		borderRadius: 8,
+		marginVertical: 10,
+		alignItems: "center",
+	},
+	scoreText: {
+		fontSize: 16,
+		fontWeight: "bold",
+		color: "#2e7d32",
 	},
 	recordContainer: {
 		alignItems: "center",
@@ -334,6 +497,9 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 10,
 		borderRadius: 5,
 	},
+	evaluatedButton: {
+		backgroundColor: "#2e7d32",
+	},
 	deleteButton: {
 		backgroundColor: "#ff4444",
 		padding: 5,
@@ -358,6 +524,9 @@ const styles = StyleSheet.create({
 		paddingVertical: 12,
 		paddingHorizontal: 25,
 		borderRadius: 8,
+	},
+	disabledButton: {
+		backgroundColor: "#cccccc",
 	},
 	buttonText: {
 		color: "white",

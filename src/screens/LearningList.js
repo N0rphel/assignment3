@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, FlatList } from "react-native";
 import { useSelector } from "react-redux";
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { studyAPI } from "../API/drugSpeakAPI"; // Import your API
 import { selectCurrentUser } from "../redux/authSlice"; // Import user selector
 
@@ -23,13 +23,6 @@ export default function LearningList() {
 	const toggleCurrent = () => setShowCurrent(!showCurrent);
 	const toggleFinished = () => setShowFinished(!showFinished);
 
-	// Fetch study record on component mount
-	useEffect(() => {
-		if (userId) {
-			fetchStudyRecord();
-		}
-	}, [userId]);
-
 	const fetchStudyRecord = async () => {
 		try {
 			setLoading(true);
@@ -48,6 +41,22 @@ export default function LearningList() {
 			setLoading(false);
 		}
 	};
+
+	// Fetch study record on component mount
+	useEffect(() => {
+		if (userId) {
+			fetchStudyRecord();
+		}
+	}, [userId]);
+
+	// Refetch data when screen comes into focus
+	useFocusEffect(
+		React.useCallback(() => {
+			if (userId) {
+				fetchStudyRecord();
+			}
+		}, [userId])
+	);
 
 	const renderDrug = ({ item }) => (
 		<TouchableOpacity
@@ -75,8 +84,9 @@ export default function LearningList() {
 			{/* Display API counts alongside Redux counts */}
 			<View style={styles.statsContainer}>
 				<Text style={styles.statsText}>
-					API Stats - Current: {studyRecord?.currentLearning || 0}, 
-					Finished: {studyRecord?.finishedLearning || 0}
+					Current: {studyRecord?.currentLearning || 0}, 
+					Finished: {studyRecord?.finishedLearning || 0}, 
+					Total Score: {studyRecord?.totalScore || 0}
 				</Text>
 			</View>
 

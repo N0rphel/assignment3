@@ -10,6 +10,7 @@ import {
 	TouchableOpacity,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
+import { useFocusEffect } from "@react-navigation/native";
 import { logoutUser } from "../redux/authSlice";
 import { updateUserProfile, studyAPI } from "../API/drugSpeakAPI";
 
@@ -30,13 +31,6 @@ export default function ProfileScreen({ navigation }) {
 		gender: user?.gender || "",
 	});
 
-	// Fetch study record on component mount
-	useEffect(() => {
-		if (user?.id) {
-			fetchStudyRecord();
-		}
-	}, [user?.id]);
-
 	const fetchStudyRecord = async () => {
 		try {
 			setLoadingStats(true);
@@ -55,6 +49,22 @@ export default function ProfileScreen({ navigation }) {
 			setLoadingStats(false);
 		}
 	};
+
+	// Fetch study record on component mount
+	useEffect(() => {
+		if (user?.id) {
+			fetchStudyRecord();
+		}
+	}, [user?.id]);
+
+	// Auto-refresh stats when screen comes into focus
+	useFocusEffect(
+		React.useCallback(() => {
+			if (user?.id) {
+				fetchStudyRecord();
+			}
+		}, [user?.id])
+	);
 
 	const handleUpdate = async () => {
 		if (!formData.username.trim()) {
@@ -118,25 +128,17 @@ export default function ProfileScreen({ navigation }) {
 							Total Score: {studyRecord?.totalScore || 0}
 						</Text>
 						
-						{/* Optional: Show Redux stats for comparison */}
-						<View style={styles.reduxStats}>
-							<Text style={styles.reduxStatsTitle}>Redux Stats (for comparison):</Text>
-							<Text style={styles.reduxStatsText}>
-								Current: {learningState?.current?.length || 0}, 
-								Finished: {learningState?.finished?.length || 0}
-							</Text>
-						</View>
 					</>
 				)}
 				
-				{/* Refresh button */}
+				{/* Manual refresh button (now optional since auto-refresh is enabled) */}
 				<TouchableOpacity 
 					style={styles.refreshButton} 
 					onPress={fetchStudyRecord}
 					disabled={loadingStats}
 				>
 					<Text style={styles.refreshButtonText}>
-						{loadingStats ? "Loading..." : "Refresh Stats"}
+						{loadingStats ? "Loading..." : "Manual Refresh"}
 					</Text>
 				</TouchableOpacity>
 			</View>
